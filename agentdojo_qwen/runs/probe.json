@@ -1,0 +1,21 @@
+{
+  "victim": {
+    "endpoint": "https://llm.oasishpc.hk/v1",
+    "model": "Qwen3.8-27B-FP8",
+    "available_models": [
+      "Qwen3.8-27B-FP8"
+    ],
+    "model_source": "discovered",
+    "native_tool_calls": true
+  },
+  "attacker": {
+    "endpoint": "https://oac500-qwen25ablite.oasishpc.hk/v1",
+    "model": "huihui-ai/Qwen2.5-32B-Instruct-abliterated",
+    "available_models": [
+      "huihui-ai/Qwen2.5-32B-Instruct-abliterated"
+    ],
+    "model_source": "discovered",
+    "native_tool_calls": null,
+    "error": "InternalServerError: Error code: 500 - {'error': {'message': \"cannot import name 'normalize_tool_choice' from 'xgrammar' (/opt/conda/lib/python3.10/site-packages/xgrammar/__init__.py)\", 'type': 'InternalServerError', 'param': None, 'code': 500}}"
+  }
+}
