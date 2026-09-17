@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 from pathlib import Path
 
 from agentdojo.attacks.attack_registry import load_attack
 from agentdojo.benchmark import benchmark_suite_with_injections, benchmark_suite_without_injections
+from agentdojo.logging import OutputLogger
 from agentdojo.task_suite.load_suites import get_suite
 
 from agentdojo_qwen.config import load_config
 from agentdojo_qwen.pipeline import build_pipeline
 from agentdojo_qwen.report import summarize, write_summary
+
+# Import custom attack modules so their @register_attack decorators run.
+for _module in ("agentdojo_qwen.attacks_qwen_client", "agentdojo_qwen.attacks_pyrit"):
+    try:
+        importlib.import_module(_module)
+    except ImportError:
+        pass
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,35 +48,38 @@ def main() -> None:
         return
 
     out_dir = Path(args.out) if args.out else Path(cfg.log_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     pipeline = build_pipeline(cfg, name_anchor=(args.mode == "attack"))
 
     user_tasks = args.user_task or None
     injection_tasks = args.injection_task or None
 
-    if args.mode == "no-attack":
-        results = benchmark_suite_without_injections(
-            pipeline,
-            suite,
-            logdir=out_dir,
-            force_rerun=True,
-            user_tasks=user_tasks,
-            benchmark_version=version,
-        )
-        name = "no-attack"
-    else:
-        attacker = load_attack(args.attack, suite, pipeline)
-        attacker.model_name = cfg.victim_model  # address the victim by its real name
-        results = benchmark_suite_with_injections(
-            pipeline,
-            suite,
-            attacker,
-            logdir=out_dir,
-            force_rerun=True,
-            user_tasks=user_tasks,
-            injection_tasks=injection_tasks,
-            benchmark_version=version,
-        )
-        name = args.attack
+    # OutputLogger MUST wrap the benchmark calls so TraceLogger's delegate has .logdir.
+    with OutputLogger(str(out_dir)):
+        if args.mode == "no-attack":
+            results = benchmark_suite_without_injections(
+                pipeline,
+                suite,
+                logdir=out_dir,
+                force_rerun=True,
+                user_tasks=user_tasks,
+                benchmark_version=version,
+            )
+            name = "no-attack"
+        else:
+            attacker = load_attack(args.attack, suite, pipeline)
+            attacker.model_name = cfg.victim_model
+            results = benchmark_suite_with_injections(
+                pipeline,
+                suite,
+                attacker,
+                logdir=out_dir,
+                force_rerun=True,
+                user_tasks=user_tasks,
+                injection_tasks=injection_tasks,
+                benchmark_version=version,
+            )
+            name = args.attack
 
     summary = summarize(results)
     write_summary(out_dir, name, summary)
